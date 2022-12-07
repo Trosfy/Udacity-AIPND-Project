@@ -12,7 +12,7 @@ def get_input_args():
     parser.add_argument('--save_dir', type = str, default = './', help = 'path to save checkpoint')
     parser.add_argument('--arch', type = str, default = 'densenet161', help = 'model of the NN architecture, valid values = densenet161, vgg13')
     parser.add_argument('--learning_rate', type = float, default = 0.003, help = 'learning rate of the NN')
-    parser.add_argument('--hidden_units', type = float, default = 512, help = 'size of the hidden units used')
+    parser.add_argument('--hidden_units', type = int, default = 512, help = 'size of the hidden units used')
     parser.add_argument('--dropout', type = float, default = 0.5, help = 'learning rate of the NN')
     parser.add_argument('--epochs', type = int, default = 5, help = 'number of loops to train the NN')
     parser.add_argument('--gpu', action='store_true', help = 'enable gpu')
@@ -27,9 +27,34 @@ def train(data_dir, save_dir, arch, learning_rate, hidden_units, dropout, epochs
     else:
         device = "cpu"
         
+    
+    
+    # differentiate train, valid, test directories
+    train_dir = data_dir + '/train'
+    valid_dir = data_dir + '/valid'
+    test_dir = data_dir + '/test'
+    
+    # load data
+    train_transforms = transforms.Compose([transforms.RandomRotation(40), transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.RandomVerticalFlip(), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+    valid_transforms = transforms.Compose([transforms.Resize(255), transforms.CenterCrop(224), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+    test_transforms = transforms.Compose([transforms.Resize(255), transforms.CenterCrop(224), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+                                           
+    # load datasets
+    train_dataset = datasets.ImageFolder(train_dir, transform=train_transforms)
+    valid_dataset = datasets.ImageFolder(valid_dir, transform=valid_transforms)
+    test_dataset = datasets.ImageFolder(test_dir, transform=test_transforms)
+    
+    
+
+    # define data loaders
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=64)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=64)
+    print("Data loaded! Building NN...")
+
     # get pretrained model and set classifier
     input_units = 0
-    output_units = 102
+    output_units = len(train_dataset.class_to_idx)
     if arch == "densenet161":
         model = models.densenet161(pretrained=True)
         input_units = 2208
@@ -58,29 +83,7 @@ def train(data_dir, save_dir, arch, learning_rate, hidden_units, dropout, epochs
     for param in model.parameters():
         param.requires_grad = False
 
-    model.classifier = classifier
-    
-    # differentiate train, valid, test directories
-    train_dir = data_dir + '/train'
-    valid_dir = data_dir + '/valid'
-    test_dir = data_dir + '/test'
-    
-    # load data
-    train_transforms = transforms.Compose([transforms.RandomRotation(40), transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.RandomVerticalFlip(), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    valid_transforms = transforms.Compose([transforms.Resize(255), transforms.CenterCrop(224), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    test_transforms = transforms.Compose([transforms.Resize(255), transforms.CenterCrop(224), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-                                           
-    # load datasets
-    train_dataset = datasets.ImageFolder(train_dir, transform=train_transforms)
-    valid_dataset = datasets.ImageFolder(valid_dir, transform=valid_transforms)
-    test_dataset = datasets.ImageFolder(test_dir, transform=test_transforms)
-
-    # define data loaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=64)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=64)
-    print("Data loaded! Starting to train...")
-                                           
+    model.classifier = classifier                                    
     criterion = nn.NLLLoss()
     optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
     model.to(device)
@@ -89,7 +92,7 @@ def train(data_dir, save_dir, arch, learning_rate, hidden_units, dropout, epochs
     iterator = 0
     running_loss = 0
     print_on = 5
-
+    print("Starting to train...")
     for epoch in range(epochs):
         for inputs, labels in train_loader:
             iterator += 1

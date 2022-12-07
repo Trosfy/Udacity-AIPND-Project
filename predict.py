@@ -142,7 +142,7 @@ def main():
     
     # set parameters
     image_path = input_arg.image_path
-    checkpoint = input_arg.checkpoint = "checkpoint.pth"
+    checkpoint = input_arg.checkpoint
     top_k = input_arg.top_k
     category_names = input_arg.category_names
     gpu_enabled = input_arg.gpu
